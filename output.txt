@@ -1,0 +1,5 @@
+Starting API tests...
+Test 1 Passed: Valid symbol 'AAPL' returned valid data.
+Test 2 Passed: Missing symbol returned appropriate error.
+Test 3 Passed: Invalid symbol 'INVALID' returned appropriate error.
+API tests completed.

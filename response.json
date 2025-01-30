@@ -1,0 +1,15 @@
+{
+    "success": true,
+    "data": {
+        "symbol": "AAPL",
+        "name": "Apple Inc.",
+        "current_price": 145.6,
+        "previous_close": 144.5,
+        "open": 145.0,
+        "day_high": 146.2,
+        "day_low": 144.7,
+        "volume": 89012345,
+        "market_cap": 2425000000000,
+        "currency": "USD"
+    }
+}
