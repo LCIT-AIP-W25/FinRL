@@ -1,6 +1,6 @@
+import requests
 import time
 import random
-import yfinance as yf
 
 # Sample users data (For simplicity in the CLI version, we store it in a dictionary)
 users = {}
@@ -54,22 +54,20 @@ def login():
         return None
 
 def get_latest_stock_price(stock_symbol):
+    base_url = "http://127.0.0.1:5000/api/stock"  # Replace with your API's actual URL
     try:
-        # Fetch the latest stock data using yfinance (you could integrate FinRL data later)
-        stock_data = yf.Ticker(stock_symbol)
-        stock_price = stock_data.history(period="1d")['Close'][0]  # Get today's closing price
-        return stock_price
+        response = requests.get(base_url, params={"symbol": stock_symbol})
+        if response.status_code == 200 and response.json().get("success"):
+            return response.json().get("price")
+        else:
+            print(f"Error fetching stock data for {stock_symbol}: {response.json().get('message', 'Unknown error')}")
+            return None
     except Exception as e:
-        print(f"Error fetching stock data: {e}")
+        print(f"Error connecting to stock API: {e}")
         return None
 
 def buy_stock(user):
-    print("Available stocks:")
-    available_stocks = ['AAPL', 'GOOGL', 'AMZN', 'TSLA']
-    for symbol in available_stocks:
-        price = get_latest_stock_price(symbol)
-        if price:
-            print(f"{symbol}: ${price:.2f} per share")
+    print("Available stocks: AAPL, GOOGL, AMZN, TSLA")
     
     stock_symbol = input("Enter the stock symbol you want to buy: ").upper()
     quantity = int(input("Enter the quantity of stock you want to buy: "))
