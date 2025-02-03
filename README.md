@@ -41,11 +41,30 @@ pip install yfinance
 3. **View Portfolio**: Check your stocks and remaining balance.
 4. **Logout**: Log out anytime.
 
-## Future Updates
 
-- **FinRL Integration**: Algorithmic trading and stock data analysis.
-- **MongoDB Backend**: Storing user data and transactions.
-- **Frontend**: React or HTML/JS for an interactive web interface.
+# Stock Prediction API with A2C Model and Risk Analysis
+
+A Flask-based API that provides stock predictions using Advantage Actor-Critic (A2C) reinforcement learning and comprehensive risk analysis.
+
+## Features
+
+- Real-time stock data fetching from Yahoo Finance
+- Technical indicators calculation (SMA, RSI)
+- Reinforcement Learning predictions using A2C algorithm
+- Risk metrics calculation (Volatility, Sharpe Ratio, Max Drawdown, VaR)
+- REST API endpoint for easy integration
+
+## Requirements
+
+- Python 3.7+
+- pip package manager
+
+## Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/stock-prediction-api.git
+cd stock-prediction-api
 
 ## Troubleshooting
 
@@ -57,4 +76,4 @@ pip install yfinance
 Open-source under the [MIT License](LICENSE).
 ```
 
-This version keeps the essential information while being more concise.
+

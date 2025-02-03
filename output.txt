@@ -3,3 +3,17 @@ Test 1 Passed: Valid symbol 'AAPL' returned valid data.
 Test 2 Passed: Missing symbol returned appropriate error.
 Test 3 Passed: Invalid symbol 'INVALID' returned appropriate error.
 API tests completed.
+
+
+{
+    "ticker": "AAPL",
+    "last_price": 150.82,
+    "predictions": [0.8, 1.0, 0.5, 0.7, 0.9, 1.0, 0.6, 0.8, 0.7, 0.9],
+    "risk_analysis": {
+        "volatility": 0.0123,
+        "sharpe_ratio": 0.782,
+        "max_drawdown": -0.2314,
+        "value_at_risk": -0.0345
+    },
+    "status": "success"
+}

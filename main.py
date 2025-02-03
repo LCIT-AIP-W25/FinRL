@@ -2,7 +2,7 @@ import requests
 import time
 import random
 
-# Sample users data (For simplicity in the CLI version, we store it in a dictionary)
+# Right now we are storing the data in a dictionary
 users = {}
 
 # User class
