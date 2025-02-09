@@ -46,3 +46,14 @@ Test the model on unseen data.
 Compare results with benchmark indices like S&P 500.
 Deploy the Agent:
 Integrate with live trading platforms like Alpaca for real-world trading.
+
+Understanding Risk Management in Trading
+A risk management model helps control potential losses in your stock trading bot. It ensures profits are maximized while risks are minimized.
+Key risk factors to address:
+1.	Market Risk – Stock price fluctuations.
+2.	Liquidity Risk – Inability to sell assets at expected prices.
+3.	Volatility Risk – High price swings affecting predictions.
+4.	Regulatory Risk – Compliance with financial regulations.
+5.	Execution Risk – Delay in trade execution leading to losses.
+
+
