@@ -1,0 +1,6 @@
+Flask
+yfinance
+finrl
+stable-baselines3
+pandas
+scikit-learn
