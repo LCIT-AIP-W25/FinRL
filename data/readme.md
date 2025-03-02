@@ -1,0 +1,2 @@
+To get the 5 Year data of a particular stock go to the get_data.py file and enter the stock ticker name in the variabel stock_name for example " stock_name = "AAPL" ".
+To get the 5 Year data of sp500 index run the get_data_index.py it will run automatically and get the stock ticker names from wikipedia page and run. Note that the Alpha Vantage Api only allows 25 requests per day so at once running the script only 25 stock data will be downloaded.
