@@ -1,0 +1,7 @@
+flask
+yfinance
+numpy
+pandas
+stable-baselines3
+scikit-learn
+quantstats
