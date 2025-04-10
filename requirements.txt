@@ -1,0 +1,7 @@
+pandas
+numpy
+torch
+matplotlib
+yfinance
+tensorflow==2.10
+lxml>=4.6.3
