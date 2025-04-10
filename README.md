@@ -59,8 +59,7 @@
  #### now train the ddpg agent using the command 'python train_ddpg.py' in the terminal.
  #### run the main file to up the trading bot using the command 'python main.py' in the terminal.
 
-
-
+### for UI get the stockTradingUI folder which is developed in react.js command to start the application 'npm start'
 
 
 
