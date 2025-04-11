@@ -47,6 +47,19 @@
  #### Constraints: Time, budget, and resource limitations.
  #### Assumptions: Availability of historical market data, necessary infrastructure, and FinRL access.
 
+ ### HOW TO RUN THE CODE
+
+ #### Clone the Repository 
+ #### install required libraries using 'pip install -r requirements.txt'
+ #### start scraping data
+ ##### for a single data - ###### testing purpose only use the data_preprocessing.py file runt the command 'python data_preprocessing.py' in the terminal
+ ##### for all stocks in s&p 500 - run the command 'python data__preprocessing.py' in the terminal
+ #### now move to train the model - LSTM use the command 'python lstm_model.py' in the terminal.
+ #### for need to fetch the prediction value for the ddpg agent use the command ' python lstm_data_prep.py' in the terminal.
+ #### now train the ddpg agent using the command 'python train_ddpg.py' in the terminal.
+ #### run the main file to up the trading bot using the command 'python main.py' in the terminal.
+
+### for UI get the stockTradingUI folder which is developed in react.js command to start the application 'npm start'
 
 
 
