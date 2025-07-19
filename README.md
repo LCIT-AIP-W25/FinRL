@@ -42,7 +42,7 @@ The bot supports 500+ S&P 500 stocks including:
 
 ```bash
 git clone <your-repository-url>
-cd BACKENDNNEW
+cd FinRL
 ```
 
 ### 2. Install Dependencies
@@ -67,18 +67,30 @@ GROQ_API_KEY=your_groq_api_key_here
 
 ### 4. Database Setup
 
-1. Create a PostgreSQL database
-2. Update `db_config.py` with your database credentials
-3. Run the database initialization scripts
+- PostgreSQL database is required
+- Ensure proper database credentials in `db_config.py`
+- Run database initialization scripts before first use
+- Required tables: `tickers`, `lstm_predictions`, `stock_data`, `finance_news`
+
+### 5. Start the API Server
+
 
 ### 5. Start the API Server
 
 ```bash
-cd FinRL
+cd backendnew
 uvicorn api:app --reload --host 0.0.0.0 --port 8000
 ```
 
 The API will be available at: `http://localhost:8000`
+
+### 6. (Optional) Start Frontend Development
+
+```bash
+cd backendnew/stockTradingbotUI
+npm install
+npm start
+```
 
 ## 📖 API Documentation
 
@@ -87,9 +99,39 @@ Visit `http://localhost:8000/docs` for interactive API documentation.
 
 ### Key Endpoints
 
+#### Get Available Data
+```http
+GET /tickers                    # Get all available tickers
+GET /companies                  # Get all available companies
+GET /find_ticker?q=AAPL        # Find ticker by name/company
+```
+
+#### Trading Recommendations
+```http
+POST /action
+Content-Type: application/json
+
+{
+  "ticker": "AAPL",
+  "risk_level": "medium",
+  "capital": 10000
+}
+```
+
+#### Trading Suggestions (Historical)
+```http
+GET /suggestion?ticker=AAPL&risk_level=medium
+```
+
+#### Top/Bottom Tickers
+```http
+GET /top-tickers?risk_level=medium&capital=10000
+GET /bottom-tickers?risk_level=medium&capital=10000
+```
+
 #### Chatbot
 ```http
-POST /chatbot
+POST /chat
 Content-Type: application/json
 
 {
@@ -98,6 +140,19 @@ Content-Type: application/json
   "capital": 10000
 }
 ```
+
+#### Advanced Chatbot (with Groq API)
+```http
+POST /chatbot
+Content-Type: application/json
+
+{
+  "message": "What's the correlation between AAPL and MSFT?",
+  "risk_level": "medium",
+  "capital": 10000
+}
+```
+
 
 #### Trading Recommendations
 ```http
@@ -179,35 +234,40 @@ python lstm_data_prep.py
 - **Medium**: Balanced risk-reward strategy
 - **High**: Aggressive approach, higher potential returns
 
-### Model Parameters
-- **State Dimension**: 2 (prediction + risk level)
-- **Action Dimension**: 1 (buy/sell signal)
-- **Learning Rate**: 0.001
-- **Batch Size**: 64
-- **Memory Size**: 100000
+### Model Files
+- Trained models are large files and may not be included in the repository
+- DDPG models are stored in the `models/` directory with naming pattern: `{TICKER}_ddpg_actor_{RISK_LEVEL}.pth`
+- LSTM models are stored in `backendnew/models/` with naming pattern: `{TICKER}_lstm_model.h5` and `{TICKER}_scaler.pkl`
+
 
 ## 📁 Project Structure
 
 ```
-SCRAPING/
-├── FinRL/
-│   ├── api.py                 # FastAPI server
-│   ├── api_utils.py           # API utility functions
-│   ├── ddpg_agent.py          # DDPG agent implementation
-│   ├── lstm_model.py          # LSTM model implementation
-│   ├── data_preprocessing.py  # Data preprocessing scripts
-│   ├── train_ddpg.py          # DDPG training script
-│   ├── sentiment_analysis.py  # News sentiment analysis
-│   ├── db_config.py           # Database configuration
-│   ├── requirements.txt       # Python dependencies
-│   └── models/                # Trained model files
-├── models/                    # Additional model files
-├── data/                      # Data storage
-├── .env                       # Environment variables (not in git)
-├── .env.example              # Environment template
-├── .gitignore                # Git ignore rules
-└── README.md                 # This file
-```
+FinRL/
+├── backendnew/                    # Main backend application
+│   ├── api.py                    # FastAPI server and endpoints
+│   ├── api_utils.py              # API utility functions and chatbot logic
+│   ├── ddpg_agent.py             # DDPG agent implementation
+│   ├── lstm_model.py             # LSTM model implementation
+│   ├── data_preprocessing.py     # Data preprocessing scripts
+│   ├── train_ddpg.py             # DDPG training script
+│   ├── sentiment_analysis.py     # News sentiment analysis
+│   ├── db_config.py              # Database configuration
+│   ├── requirements.txt          # Python dependencies
+│   ├── models/                   # Trained LSTM models and scalers
+│   └── stockTradingbotUI/        # React frontend (in development)
+│       ├── package.json          # Frontend dependencies
+│       └── node_modules/         # Frontend packages
+├── models/                       # Trained DDPG models
+│   ├── AAPL_ddpg_actor_low.pth
+│   ├── AAPL_ddpg_actor_medium.pth
+│   ├── AAPL_ddpg_actor_high.pth
+│   └── ... (for all tickers)
+├── data/                         # Data storage
+├── .env                          # Environment variables (not in git)
+├── .gitignore                    # Git ignore rules
+└── README.md                     # This file
+
 
 ## 🚨 Important Notes
 
