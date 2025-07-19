@@ -42,7 +42,7 @@ The bot supports 500+ S&P 500 stocks including:
 
 ```bash
 git clone <your-repository-url>
-cd SCRAPING
+cd BACKENDNNEW
 ```
 
 ### 2. Install Dependencies
