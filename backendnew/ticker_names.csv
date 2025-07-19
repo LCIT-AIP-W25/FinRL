@@ -1,0 +1,12 @@
+ticker,company
+AAPL,Apple Inc.
+MSFT,Microsoft Corporation
+GOOG,Alphabet Inc.
+META,Meta Platforms Inc.
+TSLA,Tesla Inc.
+NFLX,Netflix Inc.
+NVDA,NVIDIA Corporation
+AMZN,Amazon.com Inc.
+CRM,Salesforce Inc.
+AMD,Advanced Micro Devices Inc.
+# ...add more as needed 
