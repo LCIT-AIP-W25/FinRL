@@ -9,6 +9,22 @@ MODEL_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'model
 RISK_LEVELS = ['low', 'medium', 'high']
 RISK_LEVEL_MAPPING = {'low': 0, 'medium': 1, 'high': 2}
 
+# Model caching to avoid reloading models
+_model_cache = {}
+
+def get_cached_agent(ticker, risk_level):
+    """Get or load DDPG agent from cache"""
+    cache_key = f"{ticker}_{risk_level}"
+    if cache_key not in _model_cache:
+        model_path = os.path.join(MODEL_DIR, f"{ticker}_ddpg_actor_{risk_level}.pth")
+        if os.path.exists(model_path):
+            agent = DDPGAgent(state_dim=2, action_dim=1)
+            agent.actor.load_state_dict(torch.load(model_path, map_location='cpu'))
+            _model_cache[cache_key] = agent
+        else:
+            _model_cache[cache_key] = None
+    return _model_cache[cache_key]
+
 
 def get_available_tickers_and_risk_levels():
     tickers = sorted({f.split('_')[0] for f in os.listdir(MODEL_DIR) if f.endswith('_ddpg_actor_low.pth')})
@@ -16,9 +32,9 @@ def get_available_tickers_and_risk_levels():
 
 
 def get_trading_suggestions(ticker, risk_level):
-    model_path = os.path.join(MODEL_DIR, f"{ticker}_ddpg_actor_{risk_level}.pth")
-    agent = DDPGAgent(state_dim=2, action_dim=1)
-    agent.actor.load_state_dict(torch.load(model_path, map_location='cpu'))
+    agent = get_cached_agent(ticker, risk_level)
+    if agent is None:
+        return []
     conn = get_connection()
     data = pd.DataFrame()
     if conn:
@@ -53,11 +69,9 @@ def get_trading_suggestions(ticker, risk_level):
 
 
 def get_action_for_ticker(ticker, risk_level, capital):
-    model_path = os.path.join(MODEL_DIR, f"{ticker}_ddpg_actor_{risk_level}.pth")
-    if not os.path.exists(model_path):
+    agent = get_cached_agent(ticker, risk_level)
+    if agent is None:
         return {"error": f"No model found for {ticker} with {risk_level} risk level."}
-    agent = DDPGAgent(state_dim=2, action_dim=1)
-    agent.actor.load_state_dict(torch.load(model_path, map_location='cpu'))
     conn = get_connection()
     latest_state = None
     if conn:
@@ -95,10 +109,8 @@ def get_top_bottom_tickers(risk_level, capital, top=True):
     tickers = sorted({f.split('_')[0] for f in os.listdir(MODEL_DIR) if f.endswith('_ddpg_actor_low.pth')})
     ticker_actions = []
     for ticker in tickers:
-        model_path = os.path.join(MODEL_DIR, f"{ticker}_ddpg_actor_{risk_level}.pth")
-        if os.path.exists(model_path):
-            agent = DDPGAgent(state_dim=2, action_dim=1)
-            agent.actor.load_state_dict(torch.load(model_path, map_location='cpu'))
+        agent = get_cached_agent(ticker, risk_level)
+        if agent is not None:
             conn = get_connection()
             latest_state = None
             if conn:
