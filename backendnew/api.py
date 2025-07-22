@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, Response
 from pydantic import BaseModel
 from typing import Optional
 import sys
@@ -12,11 +12,36 @@ import pandas as pd
 from ddpg_agent import DDPGAgent
 from db_config import get_connection
 import requests
+from fastapi.middleware.cors import CORSMiddleware
+
 
 # Load environment variables
 load_dotenv()
 
 app = FastAPI(title="Trading Bot RESTful API", description="API for trading suggestions and chatbot", version="1.0")
+
+pg_pool = psycopg2.pool.SimpleConnectionPool(
+    minconn=1,
+    maxconn=10,
+    user=os.getenv("DB_USER"),
+    password=os.getenv("DB_PASSWORD"),
+    host=os.getenv("DB_HOST"),
+    port=os.getenv("DB_PORT"),
+    database=os.getenv("DB_NAME")
+)
+
+origins = [
+    "http://localhost:3000",               # Local dev frontend
+    "http://127.0.0.1:3000",               # Just in case
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,            # For dev, you can use ["*"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class ActionRequest(BaseModel):
     ticker: str
@@ -27,6 +52,12 @@ class ChatRequest(BaseModel):
     message: str
     risk_level: str
     capital: float
+
+#Health API for uptime monitoring
+@app.head("/")
+@app.get("/")
+def health_check():
+    return Response(status_code=200)
 
 @app.get("/tickers")
 def tickers():
@@ -458,39 +489,29 @@ def chatbot(request: ChatRequest):
     else:
         llm_response = groq_fallback(user_input)
         return {"response": llm_response} 
+    
 @app.get("/prediction_by_date")
 def prediction_by_date(
     ticker: str = Query(..., description="Stock ticker symbol"),
-    date: str = Query(..., description="Prediction date in YYYY-MM-DD format"),
-    risk_level: str = Query(None, description="Risk level: low, medium, high (optional)")
+    date: str = Query(..., description="Prediction date in YYYY-MM-DD format")
 ):
     """
-    Get the LSTM prediction for a ticker on a specific date (and optional risk level).
+    Get the LSTM prediction(s) for a ticker on a specific date, returning all available risk levels.
     """
     conn = get_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Database connection failed.")
     try:
-        if risk_level:
-            sql = """
-                SELECT date, prediction, risk_level
-                FROM lstm_predictions
-                WHERE ticker = %s AND date = %s AND risk_level = %s
-                LIMIT 1
-            """
-            params = (ticker, date, risk_level)
-        else:
-            sql = """
-                SELECT date, prediction, risk_level
-                FROM lstm_predictions
-                WHERE ticker = %s AND date = %s
-                LIMIT 1
-            """
-            params = (ticker, date)
+        sql = """
+            SELECT date, prediction, risk_level
+            FROM lstm_predictions
+            WHERE ticker = %s AND date = %s
+        """
+        params = (ticker, date)
         df = pd.read_sql(sql, conn, params=params)
         if df.empty:
             raise HTTPException(status_code=404, detail="No prediction found for the given ticker and date.")
-        result = df.iloc[0].to_dict()
-        return {"prediction": result}
+        results = df.to_dict(orient='records')
+        return {"predictions": results}
     finally:
         conn.close()
