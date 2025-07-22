@@ -77,12 +77,11 @@ DB_PASSWORD=your_password
 
 ### 4. Database Setup
 
-1. Create a PostgreSQL database
-2. Update `db_config.py` with your database credentials
-3. Run the database initialization scripts:
-```bash
-python populate_tickers_table.py
-```
+- PostgreSQL database is required
+- Ensure proper database credentials in `db_config.py`
+- Run database initialization scripts before first use
+- Required tables: `tickers`, `lstm_predictions`, `stock_data`, `finance_news`
+
 
 ### 5. Start the API Server
 
@@ -109,11 +108,49 @@ Visit `http://localhost:8000/docs` for interactive API documentation.
 ### Key Endpoints
 
 #### Get Available Data
+
 ```http
 GET /tickers                    # Get all available tickers
 GET /companies                  # Get all available companies
 GET /find_ticker?q=AAPL        # Find ticker by name/company
 ```
+
+#### Trading Recommendations
+```http
+POST /action
+Content-Type: application/json
+
+{
+  "ticker": "AAPL",
+  "risk_level": "medium",
+  "capital": 10000
+}
+```
+
+#### Trading Suggestions (Historical)
+```http
+GET /suggestion?ticker=AAPL&risk_level=medium
+```
+
+#### Top/Bottom Tickers
+```http
+GET /top-tickers?risk_level=medium&capital=10000
+GET /bottom-tickers?risk_level=medium&capital=10000
+```
+
+
+#### Advanced Chatbot (with Groq API)
+```http
+POST /chatbot
+Content-Type: application/json
+
+{
+  "message": "What's the correlation between AAPL and MSFT?",
+  "risk_level": "medium",
+  "capital": 10000
+}
+```
+
 
 #### Trading Recommendations
 ```http
@@ -246,14 +283,11 @@ python resume_lstm_training.py
 - **Medium**: Balanced risk-reward strategy (risk_level = 1)
 - **High**: Aggressive approach, higher potential returns (risk_level = 2)
 
-### Model Parameters
-- **State Dimension**: 2 (prediction + risk level)
-- **Action Dimension**: 1 (buy/sell signal)
-- **Learning Rate**: 1e-4 (Actor), 1e-3 (Critic)
-- **Batch Size**: 64
-- **Memory Size**: 100,000
-- **LSTM Time Steps**: 100
-- **Prediction Days**: 10
+
+### Model Files
+- Trained models are large files and may not be included in the repository
+- DDPG models are stored in the `models/` directory with naming pattern: `{TICKER}_ddpg_actor_{RISK_LEVEL}.pth`
+- LSTM models are stored in `backendnew/models/` with naming pattern: `{TICKER}_lstm_model.h5` and `{TICKER}_scaler.pkl`
 
 ## 📁 Project Structure
 
@@ -282,7 +316,6 @@ FinRL/
 ├── .env                          # Environment variables (not in git)
 ├── .gitignore                    # Git ignore rules
 └── README.md                     # This file
-```
 
 ## 🚨 Important Notes
 
