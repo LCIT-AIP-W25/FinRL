@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 import sys
@@ -76,6 +76,42 @@ def bottom_tickers(
 def chat(req: ChatRequest):
     """Chatbot endpoint: ask for buy/sell/hold or top/bottom tickers."""
     return chatbot_response(req.message, req.risk_level, req.capital) 
+
+@app.get("/prediction")
+def get_prediction(
+    ticker: str = Query(..., description="Stock ticker symbol"),
+    risk_level: str = Query(None, description="Risk level: low, medium, high (optional)")
+):
+    """
+    Get the latest LSTM prediction for a ticker (and optional risk level).
+    """
+    conn = get_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database connection failed.")
+    try:
+        if risk_level:
+            sql = """
+                SELECT date, prediction, risk_level
+                FROM lstm_predictions
+                WHERE ticker = %s AND risk_level = %s
+                ORDER BY date DESC LIMIT 1
+            """
+            params = (ticker, risk_level)
+        else:
+            sql = """
+                SELECT date, prediction, risk_level
+                FROM lstm_predictions
+                WHERE ticker = %s
+                ORDER BY date DESC LIMIT 1
+            """
+            params = (ticker,)
+        df = pd.read_sql(sql, conn, params=params)
+        if df.empty:
+            raise HTTPException(status_code=404, detail="No prediction found for the given ticker and risk level.")
+        result = df.iloc[0].to_dict()
+        return {"prediction": result}
+    finally:
+        conn.close()
 
 def groq_fallback(user_input):
     # Simple keyword check for finance/trading context
@@ -422,3 +458,39 @@ def chatbot(request: ChatRequest):
     else:
         llm_response = groq_fallback(user_input)
         return {"response": llm_response} 
+@app.get("/prediction_by_date")
+def prediction_by_date(
+    ticker: str = Query(..., description="Stock ticker symbol"),
+    date: str = Query(..., description="Prediction date in YYYY-MM-DD format"),
+    risk_level: str = Query(None, description="Risk level: low, medium, high (optional)")
+):
+    """
+    Get the LSTM prediction for a ticker on a specific date (and optional risk level).
+    """
+    conn = get_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database connection failed.")
+    try:
+        if risk_level:
+            sql = """
+                SELECT date, prediction, risk_level
+                FROM lstm_predictions
+                WHERE ticker = %s AND date = %s AND risk_level = %s
+                LIMIT 1
+            """
+            params = (ticker, date, risk_level)
+        else:
+            sql = """
+                SELECT date, prediction, risk_level
+                FROM lstm_predictions
+                WHERE ticker = %s AND date = %s
+                LIMIT 1
+            """
+            params = (ticker, date)
+        df = pd.read_sql(sql, conn, params=params)
+        if df.empty:
+            raise HTTPException(status_code=404, detail="No prediction found for the given ticker and date.")
+        result = df.iloc[0].to_dict()
+        return {"prediction": result}
+    finally:
+        conn.close()
