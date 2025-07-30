@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import Optional
 import sys
 import os
+import psycopg2
 from dotenv import load_dotenv
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from api_utils import get_all_tickers, get_all_companies, fuzzy_find_ticker, parse_user_input
@@ -10,7 +11,7 @@ from difflib import get_close_matches
 import torch
 import pandas as pd
 from ddpg_agent import DDPGAgent
-from db_config import get_connection
+from db_config import get_connection, return_connection
 import requests
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -142,7 +143,7 @@ def get_prediction(
         result = df.iloc[0].to_dict()
         return {"prediction": result}
     finally:
-        conn.close()
+        return_connection(conn)
 
 def groq_fallback(user_input):
     # Simple keyword check for finance/trading context
@@ -194,7 +195,7 @@ def chatbot(request: ChatRequest):
     if conn:
         sql = "SELECT ticker, company FROM tickers"
         ticker_df = pd.read_sql(sql, conn)
-        conn.close()
+        return_connection(conn)
         ticker_to_company = dict(zip(ticker_df['ticker'], ticker_df['company']))
 
     # Use your intent parser
@@ -219,7 +220,7 @@ def chatbot(request: ChatRequest):
                 """
                 params = (user_ticker, risk_level)
                 df = pd.read_sql(sql, conn, params=params)
-                conn.close()
+                return_connection(conn)
                 if not df.empty:
                     risk_level_mapping = {'low': 0, 'medium': 1, 'high': 2}
                     risk_level_value = risk_level_mapping.get(df.iloc[0]['risk_level'], 0)
@@ -257,7 +258,7 @@ def chatbot(request: ChatRequest):
                 ORDER BY date DESC LIMIT 5
             """
             df = pd.read_sql(sql, conn, params=(ticker,), parse_dates=['date'])
-            conn.close()
+            return_connection(conn)
             if not df.empty:
                 return {"response": f"Last 5 recommendations for {ticker} ({ticker_to_company.get(ticker, ticker)}):", "data": df.to_dict(orient='records')}
             else:
@@ -274,7 +275,7 @@ def chatbot(request: ChatRequest):
                 ORDER BY date DESC LIMIT 30
             """
             df = pd.read_sql(sql, conn, params=(ticker,))
-            conn.close()
+            return_connection(conn)
             if not df.empty:
                 volatility = df['prediction'].std()
                 return {"response": f"Volatility (std dev) for {ticker} ({ticker_to_company.get(ticker, ticker)}): {volatility:.4f}"}
@@ -297,7 +298,7 @@ def chatbot(request: ChatRequest):
                 if not df.empty:
                     vol = df['prediction'].std()
                     ticker_vols.append((ticker, vol))
-            conn.close()
+            return_connection(conn)
         if ticker_vols:
             top_vols = sorted(ticker_vols, key=lambda x: x[1], reverse=True)[:3]
             response = "Top 3 most volatile tickers (by std dev of prediction):\n"
@@ -326,7 +327,7 @@ def chatbot(request: ChatRequest):
                     """
                     params = (ticker, risk_level)
                     df = pd.read_sql(sql, conn, params=params)
-                    conn.close()
+                    return_connection(conn)
                     if not df.empty:
                         risk_level_mapping = {'low': 0, 'medium': 1, 'high': 2}
                         risk_level_value = risk_level_mapping.get(df.iloc[0]['risk_level'], 0)
@@ -364,7 +365,7 @@ def chatbot(request: ChatRequest):
                     """
                     params = (ticker, risk_level)
                     df = pd.read_sql(sql, conn, params=params)
-                    conn.close()
+                    return_connection(conn)
                     if not df.empty:
                         risk_level_mapping = {'low': 0, 'medium': 1, 'high': 2}
                         risk_level_value = risk_level_mapping.get(df.iloc[0]['risk_level'], 0)
@@ -388,7 +389,7 @@ def chatbot(request: ChatRequest):
         if conn:
             sql = "SELECT close FROM stock_data WHERE ticker = %s ORDER BY date DESC LIMIT 1"
             df = pd.read_sql(sql, conn, params=(ticker,))
-            conn.close()
+            return_connection(conn)
             if not df.empty:
                 price = df['close'].iloc[0]
                 return {"response": f"The current price of {ticker} is ${price:.2f}."}
@@ -401,7 +402,7 @@ def chatbot(request: ChatRequest):
         if conn:
             sql = "SELECT MAX(high) as max_high FROM stock_data WHERE ticker = %s AND date >= NOW() - INTERVAL '30 days'"
             df = pd.read_sql(sql, conn, params=(ticker,))
-            conn.close()
+            return_connection(conn)
             if not df.empty and pd.notnull(df['max_high'].iloc[0]):
                 return {"response": f"The highest price of {ticker} in the last 30 days was ${df['max_high'].iloc[0]:.2f}."}
             else:
@@ -413,7 +414,7 @@ def chatbot(request: ChatRequest):
         if conn:
             sql = "SELECT MIN(low) as min_low FROM stock_data WHERE ticker = %s AND date >= NOW() - INTERVAL '30 days'"
             df = pd.read_sql(sql, conn, params=(ticker,))
-            conn.close()
+            return_connection(conn)
             if not df.empty and pd.notnull(df['min_low'].iloc[0]):
                 return {"response": f"The lowest price of {ticker} in the last 30 days was ${df['min_low'].iloc[0]:.2f}."}
             else:
@@ -425,7 +426,7 @@ def chatbot(request: ChatRequest):
         if conn:
             sql = "SELECT AVG(volume) as avg_vol FROM stock_data WHERE ticker = %s AND date >= NOW() - INTERVAL '30 days'"
             df = pd.read_sql(sql, conn, params=(ticker,))
-            conn.close()
+            return_connection(conn)
             if not df.empty and pd.notnull(df['avg_vol'].iloc[0]):
                 return {"response": f"The average volume of {ticker} in the last 30 days was {int(df['avg_vol'].iloc[0]):,}."}
             else:
@@ -437,7 +438,7 @@ def chatbot(request: ChatRequest):
         if conn:
             sql = "SELECT rsi FROM stock_data WHERE ticker = %s ORDER BY date DESC LIMIT 1"
             df = pd.read_sql(sql, conn, params=(ticker,))
-            conn.close()
+            return_connection(conn)
             if not df.empty and pd.notnull(df['rsi'].iloc[0]):
                 return {"response": f"The latest RSI for {ticker} is {df['rsi'].iloc[0]:.2f}."}
             else:
@@ -449,7 +450,7 @@ def chatbot(request: ChatRequest):
         if conn:
             sql = "SELECT sma_10, sma_50 FROM stock_data WHERE ticker = %s ORDER BY date DESC LIMIT 1"
             df = pd.read_sql(sql, conn, params=(ticker,))
-            conn.close()
+            return_connection(conn)
             if not df.empty:
                 return {"response": f"The latest SMA-10 for {ticker} is {df['sma_10'].iloc[0]:.2f}, SMA-50 is {df['sma_50'].iloc[0]:.2f}."}
             else:
@@ -478,7 +479,7 @@ def chatbot(request: ChatRequest):
                 ORDER BY a.date DESC
             """
             df = pd.read_sql(sql, conn, params=(t1, t2))
-            conn.close()
+            return_connection(conn)
             if not df.empty:
                 corr = df['close1'].corr(df['close2'])
                 return {"response": f"The correlation between {t1} and {t2} over the last 90 days is {corr:.2f}."}
@@ -514,4 +515,4 @@ def prediction_by_date(
         results = df.to_dict(orient='records')
         return {"predictions": results}
     finally:
-        conn.close()
+        return_connection(conn)
