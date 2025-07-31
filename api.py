@@ -1,8 +1,14 @@
+print("🚀 RENDER DEPLOYMENT TEST - NEW CODE VERSION 2024-12-19 🚀")
+print("=" * 60)
+print("DEPLOYED VERSION 2024-06-09 - MODEL PATH FIXED")
+print("=" * 50)
+
 import os
 import pandas as pd
 import numpy as np
 import torch
 from fastapi import FastAPI, Query, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 import requests
@@ -11,11 +17,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 from functools import lru_cache
 from dotenv import load_dotenv
-import time
-
-# Import required modules
-from ddpg_agent import DDPGAgent
-from db_config import get_connection
 
 # Global cache for models and data
 _model_cache = {}
@@ -41,7 +42,7 @@ def load_model_cached(ticker: str, risk_level: str):
             return _model_cache[cache_key]
         
         try:
-            model_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models')
+            model_dir = os.path.join(os.path.dirname(__file__), 'models')
             model_path = os.path.join(model_dir, f'{ticker}_ddpg_actor_{risk_level}.pth')
             
             if os.path.exists(model_path):
@@ -101,8 +102,7 @@ def get_batch_historical_data(tickers: List[str], days: int = 252):
         print(f"Error fetching batch historical data: {e}")
         return {}
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 def get_batch_company_names(tickers: List[str]):
     """Fetch company names for multiple tickers in one query."""
@@ -119,8 +119,7 @@ def get_batch_company_names(tickers: List[str]):
         print(f"Error fetching company names: {e}")
         return {}
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 def process_ticker_batch_optimized(ticker_batch: List[str], risk_level: str, amount: float, months: int, historical_data: Dict, ticker_to_company: Dict):
     """Process a batch of tickers with optimized logic."""
@@ -137,23 +136,19 @@ def process_ticker_batch_optimized(ticker_batch: List[str], risk_level: str, amo
             conn = get_connection()
             latest_state = None
             if conn:
-                try:
-                    sql = """
-                        SELECT prediction, risk_level
-                        FROM lstm_predictions
-                        WHERE ticker = %s AND risk_level = %s
-                        ORDER BY date DESC LIMIT 1
-                    """
-                    params = (ticker, risk_level)
-                    df = pd.read_sql(sql, conn, params=params)
-                    if not df.empty:
-                        risk_level_mapping = {'low': 0, 'medium': 1, 'high': 2}
-                        risk_level_value = risk_level_mapping.get(df.iloc[0]['risk_level'], 0)
-                        latest_state = [df.iloc[0]['prediction'], risk_level_value]
-                except Exception as e:
-                    print(f"Error getting prediction for {ticker}: {e}")
-                finally:
-                    conn.close()
+                sql = """
+                    SELECT prediction, risk_level
+                    FROM lstm_predictions
+                    WHERE ticker = %s AND risk_level = %s
+                    ORDER BY date DESC LIMIT 1
+                """
+                params = (ticker, risk_level)
+                df = pd.read_sql(sql, conn, params=params)
+                conn.close()
+                if not df.empty:
+                    risk_level_mapping = {'low': 0, 'medium': 1, 'high': 2}
+                    risk_level_value = risk_level_mapping.get(df.iloc[0]['risk_level'], 0)
+                    latest_state = [df.iloc[0]['prediction'], risk_level_value]
             
             if latest_state is None:
                 risk_level_mapping = {'low': 0, 'medium': 1, 'high': 2}
@@ -245,6 +240,10 @@ def process_ticker_batch_optimized(ticker_batch: List[str], risk_level: str, amo
             continue
     
     return results
+
+# Import required modules
+from ddpg_agent import DDPGAgent
+from db_config import get_connection
 
 class ActionRequest(BaseModel):
     ticker: str
@@ -550,7 +549,7 @@ def get_portfolio_suggestions(amount: float, risk_level: str, months: int):
         return {"error": "Investment period must be between 1 and 60 months"}
     
     # Get available tickers and models
-    model_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models'))
+    model_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'models'))
     available_tickers = []
     
     # Check which tickers have models for the given risk level
@@ -579,7 +578,7 @@ def get_portfolio_suggestions(amount: float, risk_level: str, months: int):
     
     print(f"Processing {len(batches)} batches of {batch_size} tickers each...")
     
-    with ThreadPoolExecutor(max_workers=2) as executor:
+    with ThreadPoolExecutor(max_workers=4) as executor:
         # Submit batch processing tasks
         future_to_batch = {
             executor.submit(process_ticker_batch_optimized, batch, risk_level, amount, months, historical_data, ticker_to_company): batch 
@@ -591,7 +590,6 @@ def get_portfolio_suggestions(amount: float, risk_level: str, months: int):
             batch_results = future.result()
             ticker_analysis.extend(batch_results)
             print(f"Completed batch with {len(batch_results)} results")
-            time.sleep(0.1)  # Small delay to allow connection pool to recover
     
     print(f"Total processed tickers: {len(ticker_analysis)}")
     
@@ -788,4 +786,4 @@ def get_bottom_tickers(risk_level, capital):
 def chatbot_response(message, risk_level, capital):
     """Chatbot response handler."""
     # Implementation would go here
-    return {"response": f"Chatbot response for {message} with {risk_level} risk and {capital} capital"}
+    return {"response": f"Chatbot response for {message} with {risk_level} risk and {capital} capital"} 
