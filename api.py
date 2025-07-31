@@ -369,11 +369,11 @@ def companies():
     """Get all available companies."""
     try:
         companies_list = get_all_companies()
-        return {"companies": companies_list}
+        return companies_list
     except Exception as e:
         print(f"❌ Companies endpoint error: {e}")
         # Return fallback companies on any error
-        return {"companies": [
+        return [
             "Apple Inc.", "Microsoft Corporation", "Alphabet Inc.", "Amazon.com Inc.",
             "Meta Platforms Inc.", "NVIDIA Corporation", "Tesla Inc.", "Netflix Inc.",
             "Salesforce Inc.", "Adobe Inc.", "Bank of America Corp.", "Citigroup Inc.",
@@ -381,7 +381,7 @@ def companies():
             "AbbVie Inc.", "Abbott Laboratories", "Bristol-Myers Squibb Co.",
             "Amgen Inc.", "Costco Wholesale Corp.", "Advanced Micro Devices Inc.",
             "Broadcom Inc."
-        ]}
+        ]
 
 @app.get("/health")
 def health_check():
