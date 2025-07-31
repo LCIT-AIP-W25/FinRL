@@ -10,15 +10,15 @@ from pydantic import BaseModel
 from typing import List, Dict, Optional
 import requests
 from datetime import datetime, timedelta
-from concurrent.futures import ThreadPoolExecutor, as_completed
+ concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 from functools import lru_cache
-from dotenv import load_dotenv
+ dotenv import load_dotenv
 import time
 
 # Import required modules
 from ddpg_agent import DDPGAgent
-from db_config import get_connection
+from db_config import get_connection, return_connection
 
 # Global cache for models and data
 _model_cache = {}
