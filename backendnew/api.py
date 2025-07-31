@@ -1,3 +1,5 @@
+print("DEPLOYED VERSION 2025-07-31")
+
 import os
 import pandas as pd
 import numpy as np
