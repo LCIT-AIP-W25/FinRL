@@ -35,6 +35,11 @@ def get_connection_pool():
 def get_connection():
     try:
         conn = get_connection_pool().getconn()
+        # Override the close method to use return_connection
+        original_close = conn.close
+        def custom_close():
+            return_connection(conn)
+        conn.close = custom_close
         return conn
     except Exception as e:
         print("❌ Failed to get connection from pool:", e)
