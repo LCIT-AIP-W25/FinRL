@@ -1,8 +1,3 @@
-print("🚀 RENDER DEPLOYMENT TEST - NEW CODE VERSION 2024-12-19 🚀")
-print("=" * 60)
-print("DEPLOYED VERSION 2024-06-09 - MODEL PATH FIXED")
-print("=" * 50)
-
 import os
 import pandas as pd
 import numpy as np
@@ -32,6 +27,15 @@ load_dotenv()
 
 # Initialize FastAPI app
 app = FastAPI(title="FinRL Trading API", version="1.0.0")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins for development
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
+)
 
 def load_model_cached(ticker: str, risk_level: str):
     """Load model with caching to avoid repeated disk I/O."""
@@ -102,24 +106,65 @@ def get_batch_historical_data(tickers: List[str], days: int = 252):
         print(f"Error fetching batch historical data: {e}")
         return {}
     finally:
-        conn.close()
+        return_connection(conn)
 
 def get_batch_company_names(tickers: List[str]):
     """Fetch company names for multiple tickers in one query."""
     conn = get_connection()
     if not conn:
+        print("❌ No database connection available")
         return {}
+    
+    # Fallback company names for common stocks
+    fallback_companies = {
+        'AAPL': 'Apple Inc.',
+        'MSFT': 'Microsoft Corporation',
+        'GOOG': 'Alphabet Inc.',
+        'AMZN': 'Amazon.com Inc.',
+        'META': 'Meta Platforms Inc.',
+        'NVDA': 'NVIDIA Corporation',
+        'TSLA': 'Tesla Inc.',
+        'NFLX': 'Netflix Inc.',
+        'CRM': 'Salesforce Inc.',
+        'ADBE': 'Adobe Inc.',
+        'BAC': 'Bank of America Corp.',
+        'C': 'Citigroup Inc.',
+        'BLK': 'BlackRock Inc.',
+        'AXP': 'American Express Co.',
+        'COF': 'Capital One Financial Corp.',
+        'ABBV': 'AbbVie Inc.',
+        'ABT': 'Abbott Laboratories',
+        'BMY': 'Bristol-Myers Squibb Co.',
+        'AMGN': 'Amgen Inc.',
+        'COST': 'Costco Wholesale Corp.',
+        'AMD': 'Advanced Micro Devices Inc.',
+        'AVGO': 'Broadcom Inc.'
+    }
     
     try:
         placeholders = ','.join(['%s'] * len(tickers))
         sql = f"SELECT ticker, company FROM tickers WHERE ticker IN ({placeholders})"
         df = pd.read_sql(sql, conn, params=tickers)
-        return dict(zip(df['ticker'], df['company']))
+        company_dict = dict(zip(df['ticker'], df['company']))
+        
+        # Add fallback names for any missing companies
+        for ticker in tickers:
+            if ticker not in company_dict or company_dict[ticker] == ticker:
+                company_dict[ticker] = fallback_companies.get(ticker, f"{ticker} Corporation")
+        
+        # Debug: Print the results
+        print(f"get_batch_company_names: Processed {len(tickers)} tickers, found {len(company_dict)} companies")
+        for ticker in tickers[:5]:  # Show first 5 for debugging
+            company = company_dict.get(ticker, ticker)
+            print(f"  {ticker}: {company}")
+        
+        return company_dict
     except Exception as e:
         print(f"Error fetching company names: {e}")
-        return {}
+        # Return fallback names if database query fails
+        return {ticker: fallback_companies.get(ticker, f"{ticker} Corporation") for ticker in tickers}
     finally:
-        conn.close()
+        return_connection(conn)
 
 def process_ticker_batch_optimized(ticker_batch: List[str], risk_level: str, amount: float, months: int, historical_data: Dict, ticker_to_company: Dict):
     """Process a batch of tickers with optimized logic."""
@@ -136,19 +181,23 @@ def process_ticker_batch_optimized(ticker_batch: List[str], risk_level: str, amo
             conn = get_connection()
             latest_state = None
             if conn:
-                sql = """
-                    SELECT prediction, risk_level
-                    FROM lstm_predictions
-                    WHERE ticker = %s AND risk_level = %s
-                    ORDER BY date DESC LIMIT 1
-                """
-                params = (ticker, risk_level)
-                df = pd.read_sql(sql, conn, params=params)
-                conn.close()
-                if not df.empty:
-                    risk_level_mapping = {'low': 0, 'medium': 1, 'high': 2}
-                    risk_level_value = risk_level_mapping.get(df.iloc[0]['risk_level'], 0)
-                    latest_state = [df.iloc[0]['prediction'], risk_level_value]
+                try:
+                    sql = """
+                        SELECT prediction, risk_level
+                        FROM lstm_predictions
+                        WHERE ticker = %s AND risk_level = %s
+                        ORDER BY date DESC LIMIT 1
+                    """
+                    params = (ticker, risk_level)
+                    df = pd.read_sql(sql, conn, params=params)
+                    if not df.empty:
+                        risk_level_mapping = {'low': 0, 'medium': 1, 'high': 2}
+                        risk_level_value = risk_level_mapping.get(df.iloc[0]['risk_level'], 0)
+                        latest_state = [df.iloc[0]['prediction'], risk_level_value]
+                except Exception as e:
+                    print(f"Error getting prediction for {ticker}: {e}")
+                finally:
+                    return_connection(conn)
             
             if latest_state is None:
                 risk_level_mapping = {'low': 0, 'medium': 1, 'high': 2}
@@ -223,9 +272,39 @@ def process_ticker_batch_optimized(ticker_batch: List[str], risk_level: str, amo
                 confidence = min(0.7, max(0.3, abs(normalized_action - 0.5) * 1.5 + 0.3))
             
             # Add to results
+            company_name = ticker_to_company.get(ticker, ticker)
+            # Ensure we don't return ticker as company name
+            if company_name == ticker:
+                # Try to get from fallback companies
+                fallback_companies = {
+                    'AAPL': 'Apple Inc.',
+                    'MSFT': 'Microsoft Corporation',
+                    'GOOG': 'Alphabet Inc.',
+                    'AMZN': 'Amazon.com Inc.',
+                    'META': 'Meta Platforms Inc.',
+                    'NVDA': 'NVIDIA Corporation',
+                    'TSLA': 'Tesla Inc.',
+                    'NFLX': 'Netflix Inc.',
+                    'CRM': 'Salesforce Inc.',
+                    'ADBE': 'Adobe Inc.',
+                    'BAC': 'Bank of America Corp.',
+                    'C': 'Citigroup Inc.',
+                    'BLK': 'BlackRock Inc.',
+                    'AXP': 'American Express Co.',
+                    'COF': 'Capital One Financial Corp.',
+                    'ABBV': 'AbbVie Inc.',
+                    'ABT': 'Abbott Laboratories',
+                    'BMY': 'Bristol-Myers Squibb Co.',
+                    'AMGN': 'Amgen Inc.',
+                    'COST': 'Costco Wholesale Corp.',
+                    'AMD': 'Advanced Micro Devices Inc.',
+                    'AVGO': 'Broadcom Inc.'
+                }
+                company_name = fallback_companies.get(ticker, f"{ticker} Corporation")
+            
             results.append({
                 'ticker': ticker,
-                'company': ticker_to_company.get(ticker, ticker),
+                'company': company_name,
                 'action': normalized_action,
                 'expected_monthly_return': expected_monthly_return,
                 'expected_total_return': expected_total_return,
@@ -288,7 +367,65 @@ def tickers():
 @app.get("/companies")
 def companies():
     """Get all available companies."""
-    return {"companies": get_all_companies()}
+    try:
+        companies_list = get_all_companies()
+        return {"companies": companies_list}
+    except Exception as e:
+        print(f"❌ Companies endpoint error: {e}")
+        # Return fallback companies on any error
+        return {"companies": [
+            "Apple Inc.", "Microsoft Corporation", "Alphabet Inc.", "Amazon.com Inc.",
+            "Meta Platforms Inc.", "NVIDIA Corporation", "Tesla Inc.", "Netflix Inc.",
+            "Salesforce Inc.", "Adobe Inc.", "Bank of America Corp.", "Citigroup Inc.",
+            "BlackRock Inc.", "American Express Co.", "Capital One Financial Corp.",
+            "AbbVie Inc.", "Abbott Laboratories", "Bristol-Myers Squibb Co.",
+            "Amgen Inc.", "Costco Wholesale Corp.", "Advanced Micro Devices Inc.",
+            "Broadcom Inc."
+        ]}
+
+@app.get("/health")
+def health_check():
+    """Health check endpoint to test database connection."""
+    from db_config import check_connection_health
+    
+    try:
+        # Test database connection
+        db_healthy = check_connection_health()
+        
+        # Test basic queries
+        conn = get_connection()
+        ticker_count = 0
+        company_count = 0
+        
+        if conn:
+            try:
+                # Test tickers table
+                df_tickers = pd.read_sql("SELECT COUNT(*) as count FROM tickers", conn)
+                ticker_count = df_tickers.iloc[0]['count']
+                
+                # Test companies
+                df_companies = pd.read_sql("SELECT COUNT(DISTINCT company) as count FROM tickers", conn)
+                company_count = df_companies.iloc[0]['count']
+                
+            except Exception as e:
+                print(f"❌ Health check query error: {e}")
+            finally:
+                return_connection(conn)
+        
+        return {
+            "status": "healthy" if db_healthy else "unhealthy",
+            "database_connection": "connected" if db_healthy else "disconnected",
+            "tickers_count": ticker_count,
+            "companies_count": company_count,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
 
 @app.get("/find_ticker")
 def find_ticker(q: str = Query(...)):
@@ -359,7 +496,7 @@ def get_prediction(
         result = df.iloc[0].to_dict()
         return {"prediction": result}
     finally:
-        conn.close()
+        return_connection(conn)
 
 @app.post("/portfolio-suggestion")
 def portfolio_suggestion(req: PortfolioRequest):
@@ -391,151 +528,7 @@ def portfolio_suggestion(req: PortfolioRequest):
         "strategy": result.investment_strategy
     }
 
-def groq_fallback(user_input):
-    # Simple keyword check for finance/trading context
-    finance_keywords = ['stock', 'market', 'trading', 'investment', 'portfolio', 'buy', 'sell', 'hold']
-    if any(keyword in user_input.lower() for keyword in finance_keywords):
-        return "I can help with stock trading questions. Try asking about specific tickers, portfolio suggestions, or market analysis."
-    else:
-        return "I'm a financial trading assistant. I can help with stock analysis, portfolio suggestions, and trading strategies. What would you like to know?"
 
-@app.post("/chatbot")
-def chatbot(request: ChatRequest):
-    """Enhanced chatbot with more comprehensive responses."""
-    user_input = request.message.lower()
-    
-    # Extract ticker if present
-    ticker = None
-    for word in user_input.split():
-        if len(word) <= 5 and word.isupper():
-            ticker = word
-            break
-    
-    # Intent classification
-    if 'buy' in user_input or 'purchase' in user_input:
-        intent = 'buy'
-    elif 'sell' in user_input or 'short' in user_input:
-        intent = 'sell'
-    elif 'hold' in user_input or 'keep' in user_input:
-        intent = 'hold'
-    elif 'top' in user_input and ('stock' in user_input or 'ticker' in user_input):
-        intent = 'top_tickers'
-    elif 'bottom' in user_input and ('stock' in user_input or 'ticker' in user_input):
-        intent = 'bottom_tickers'
-    elif 'volume' in user_input:
-        intent = 'volume'
-    elif 'rsi' in user_input:
-        intent = 'rsi'
-    elif 'sma' in user_input or 'moving average' in user_input:
-        intent = 'sma'
-    elif 'all' in user_input and ('ticker' in user_input or 'stock' in user_input):
-        intent = 'all_tickers'
-    elif 'all' in user_input and ('company' in user_input or 'firm' in user_input):
-        intent = 'all_companies'
-    elif 'correlation' in user_input:
-        intent = 'correlation'
-    else:
-        intent = 'general'
-    
-    # Handle different intents
-    if intent == 'buy' and ticker:
-        action = get_trading_action(ticker, request.risk_level, request.capital)
-        if action == 'Buy':
-            return {"response": f"Based on the analysis, {ticker} appears to be a good buy opportunity. The model suggests buying at current levels."}
-        else:
-            return {"response": f"Currently, {ticker} doesn't show strong buy signals. Consider waiting for better entry points or exploring other opportunities."}
-    
-    elif intent == 'sell' and ticker:
-        action = get_trading_action(ticker, request.risk_level, request.capital)
-        if action == 'Sell':
-            return {"response": f"The model suggests selling {ticker} based on current market conditions and risk assessment."}
-        else:
-            return {"response": f"{ticker} doesn't show strong sell signals at the moment. Consider holding or monitoring for changes."}
-    
-    elif intent == 'hold' and ticker:
-        action = get_trading_action(ticker, request.risk_level, request.capital)
-        if action == 'Hold':
-            return {"response": f"Based on the analysis, {ticker} is currently in a hold position. Monitor for changes in market conditions."}
-        else:
-            return {"response": f"{ticker} shows {action.lower()} signals rather than hold. Consider the model's recommendation."}
-    
-    elif intent == 'top_tickers':
-        top_tickers = get_top_tickers(request.risk_level, request.capital)
-        return {"response": f"Top performing tickers for {request.risk_level} risk level: {', '.join(top_tickers[:5])}"}
-    
-    elif intent == 'bottom_tickers':
-        bottom_tickers = get_bottom_tickers(request.risk_level, request.capital)
-        return {"response": f"Bottom performing tickers for {request.risk_level} risk level: {', '.join(bottom_tickers[:5])}"}
-    
-    elif intent == 'volume' and ticker:
-        conn = get_connection()
-        if conn:
-            sql = "SELECT AVG(volume) as avg_vol FROM stock_data WHERE ticker = %s AND date >= NOW() - INTERVAL '30 days'"
-            df = pd.read_sql(sql, conn, params=(ticker,))
-            conn.close()
-            if not df.empty and pd.notnull(df['avg_vol'].iloc[0]):
-                return {"response": f"The average volume of {ticker} in the last 30 days was {int(df['avg_vol'].iloc[0]):,}."}
-            else:
-                return {"response": f"No volume data found for {ticker}."}
-
-    # --- RSI ---
-    elif intent == 'rsi' and ticker:
-        conn = get_connection()
-        if conn:
-            sql = "SELECT rsi FROM stock_data WHERE ticker = %s ORDER BY date DESC LIMIT 1"
-            df = pd.read_sql(sql, conn, params=(ticker,))
-            conn.close()
-            if not df.empty and pd.notnull(df['rsi'].iloc[0]):
-                return {"response": f"The latest RSI for {ticker} is {df['rsi'].iloc[0]:.2f}."}
-            else:
-                return {"response": f"No RSI data found for {ticker}."}
-
-    # --- SMA ---
-    elif intent == 'sma' and ticker:
-        conn = get_connection()
-        if conn:
-            sql = "SELECT sma_10, sma_50 FROM stock_data WHERE ticker = %s ORDER BY date DESC LIMIT 1"
-            df = pd.read_sql(sql, conn, params=(ticker,))
-            conn.close()
-            if not df.empty:
-                return {"response": f"The latest SMA-10 for {ticker} is {df['sma_10'].iloc[0]:.2f}, SMA-50 is {df['sma_50'].iloc[0]:.2f}."}
-            else:
-                return {"response": f"No SMA data found for {ticker}."}
-
-    # --- All Tickers ---
-    elif intent == 'all_tickers':
-        tickers = get_all_tickers()
-        return {"response": "Available tickers: " + ', '.join(tickers)}
-
-    # --- All Companies ---
-    elif intent == 'all_companies':
-        companies = get_all_companies()
-        return {"response": "Available companies: " + ', '.join(companies)}
-
-    # --- Correlation ---
-    elif intent == 'correlation' and ticker and isinstance(ticker, list) and len(ticker) == 2:
-        t1, t2 = ticker
-        conn = get_connection()
-        if conn:
-            sql = """
-                SELECT a.date, a.close as close1, b.close as close2
-                FROM stock_data a
-                JOIN stock_data b ON a.date = b.date
-                WHERE a.ticker = %s AND b.ticker = %s AND a.date >= NOW() - INTERVAL '90 days'
-                ORDER BY a.date DESC
-            """
-            df = pd.read_sql(sql, conn, params=(t1, t2))
-            conn.close()
-            if not df.empty:
-                corr = df['close1'].corr(df['close2'])
-                return {"response": f"The correlation between {t1} and {t2} over the last 90 days is {corr:.2f}."}
-            else:
-                return {"response": f"No correlation data found for {t1} and {t2}."}
-
-    # --- Fallback: Groq LLM for unknown or unsupported questions ---
-    else:
-        llm_response = groq_fallback(user_input)
-        return {"response": llm_response}
 
 def get_portfolio_suggestions(amount: float, risk_level: str, months: int):
     """Generate portfolio suggestions with profit predictions using optimized batch processing."""
@@ -738,18 +731,43 @@ def get_all_tickers():
         df = pd.read_sql("SELECT DISTINCT ticker FROM stock_data ORDER BY ticker", conn)
         return df['ticker'].tolist()
     finally:
-        conn.close()
+        return_connection(conn)
 
 def get_all_companies():
     """Get all available companies."""
     conn = get_connection()
     if not conn:
-        return []
+        print("❌ No database connection available for get_all_companies")
+        # Return fallback companies if connection fails
+        return [
+            "Apple Inc.", "Microsoft Corporation", "Alphabet Inc.", "Amazon.com Inc.",
+            "Meta Platforms Inc.", "NVIDIA Corporation", "Tesla Inc.", "Netflix Inc.",
+            "Salesforce Inc.", "Adobe Inc.", "Bank of America Corp.", "Citigroup Inc.",
+            "BlackRock Inc.", "American Express Co.", "Capital One Financial Corp.",
+            "AbbVie Inc.", "Abbott Laboratories", "Bristol-Myers Squibb Co.",
+            "Amgen Inc.", "Costco Wholesale Corp.", "Advanced Micro Devices Inc.",
+            "Broadcom Inc."
+        ]
     try:
-        df = pd.read_sql("SELECT DISTINCT company FROM tickers ORDER BY company", conn)
-        return df['company'].tolist()
+        # Get companies directly with one efficient query
+        df = pd.read_sql("SELECT DISTINCT company FROM tickers WHERE company IS NOT NULL AND company != '' ORDER BY company", conn)
+        companies = df['company'].tolist()
+        print(f"✅ get_all_companies: Found {len(companies)} companies")
+        return companies
+    except Exception as e:
+        print(f"❌ Error in get_all_companies: {e}")
+        # Return fallback companies if query fails
+        return [
+            "Apple Inc.", "Microsoft Corporation", "Alphabet Inc.", "Amazon.com Inc.",
+            "Meta Platforms Inc.", "NVIDIA Corporation", "Tesla Inc.", "Netflix Inc.",
+            "Salesforce Inc.", "Adobe Inc.", "Bank of America Corp.", "Citigroup Inc.",
+            "BlackRock Inc.", "American Express Co.", "Capital One Financial Corp.",
+            "AbbVie Inc.", "Abbott Laboratories", "Bristol-Myers Squibb Co.",
+            "Amgen Inc.", "Costco Wholesale Corp.", "Advanced Micro Devices Inc.",
+            "Broadcom Inc."
+        ]
     finally:
-        conn.close()
+        return_connection(conn)
 
 def find_ticker_by_company(company_name):
     """Find ticker by company name."""
@@ -761,7 +779,7 @@ def find_ticker_by_company(company_name):
         df = pd.read_sql(sql, conn, params=(f'%{company_name}%',))
         return df['ticker'].iloc[0] if not df.empty else None
     finally:
-        conn.close()
+        return_connection(conn)
 
 def get_trading_suggestions(ticker, risk_level):
     """Get trading suggestions for a ticker."""
