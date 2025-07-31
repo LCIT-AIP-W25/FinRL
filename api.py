@@ -322,7 +322,7 @@ def process_ticker_batch_optimized(ticker_batch: List[str], risk_level: str, amo
 
 # Import required modules
 from ddpg_agent import DDPGAgent
-from db_config import get_connection
+from db_config import get_connection, return_connection
 
 class ActionRequest(BaseModel):
     ticker: str
