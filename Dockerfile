@@ -8,6 +8,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY api.py .
+COPY ddpg_agent.py .
+COPY db_config.py .
 COPY models/ ./models/
 
 # Expose port
