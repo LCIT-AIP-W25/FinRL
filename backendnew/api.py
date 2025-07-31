@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import torch
 from fastapi import FastAPI, Query, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 import requests
@@ -33,6 +34,15 @@ load_dotenv()
 
 # Initialize FastAPI app
 app = FastAPI(title="FinRL Trading API", version="1.0.0")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins for development
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
+)
 
 def load_model_cached(ticker: str, risk_level: str):
     """Load model with caching to avoid repeated disk I/O."""
