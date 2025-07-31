@@ -3,8 +3,8 @@ services:
     name: finrl-trading-api
     env: python
     plan: free
-    buildCommand: pip install -r backendnew/requirements.txt
-    startCommand: cd backendnew && uvicorn api:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.16
