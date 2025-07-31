@@ -301,7 +301,7 @@ def tickers():
 @app.get("/companies")
 def companies():
     """Get all available companies."""
-    return {"companies": get_all_companies()}
+    return get_all_companies()
 
 @app.get("/find_ticker")
 def find_ticker(q: str = Query(...)):
